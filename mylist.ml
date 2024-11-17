@@ -27,3 +27,9 @@ let rec myFilter f lst = match lst with
 let rec myMap f lst = match lst with
     |[] ->[]
     |h::t -> add (f h) (myMap f t)
+
+let rec search state state_list equality= 
+  match state_list with
+    | []->false
+    | h::_ when equality state h -> true
+    | _::t-> search state t equality
