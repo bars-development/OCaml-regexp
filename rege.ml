@@ -24,7 +24,7 @@ module type Impl = sig
   val construct_dfa: regex_expr -> char_expr list -> dfa_structure
 end
 
-module RE2: Impl= struct
+module RE2:Impl= struct
   let rec simplify expr =
     match expr with
     | Product (a, b) when a=Eps -> simplify b
@@ -63,7 +63,7 @@ module RE2: Impl= struct
           simplify (Union(derivate b char, simplify (Product (derivate a char, b)))) 
       else 
         simplify (Product (derivate a char, b))
-    | Star a -> Product(derivate a char, Star a)
+    | Star a -> simplify (Product(derivate a char, Star a))
   
   (* DFA construction *) 
   type dfa_state = regex_expr
@@ -113,7 +113,7 @@ module RE2: Impl= struct
       end
   let myGet fallback = function
       |Some x-> x
-      |None -> fallback
+      |None -> -1
   let construct_dfa exp alphabet = 
     let rec compute_dfa_states st seen result = 
       if Mylist.search st seen eq

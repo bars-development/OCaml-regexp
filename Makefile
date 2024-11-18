@@ -1,7 +1,7 @@
 # Makefile for OCaml project
 
 # Define module names (without .ml extension)
-MODULES = mylist regular_expressions engine
+MODULES = mylist rege engine
 
 # Bytecode and Native Code Outputs
 BYTECODE_OUTPUT = project.cmo

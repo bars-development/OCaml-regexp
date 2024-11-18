@@ -1,4 +1,4 @@
-open Regular_expressions
+open Rege
 open RE2
 
 type token = 
