@@ -111,7 +111,9 @@ module RE2: Impl= struct
           | Product (c, d) when eq a c && eq b d->true
           | _ -> false
       end
-
+  let myGet fallback = function
+      |Some x-> x
+      |None -> fallback
   let construct_dfa exp alphabet = 
     let rec compute_dfa_states st seen result = 
       if Mylist.search st seen eq
@@ -122,12 +124,13 @@ module RE2: Impl= struct
     in
     let (states, table) = compute_dfa_states exp [] [] in
     let state_array = Array.of_list states in 
+    let fallback = Option.get (Array.find_index (fun y->eq y Empty) state_array) in
     let simplified_table = Array.map 
-      (fun sl-> 
-        Array.map (fun x -> 
-          Option.get (Array.find_index (fun y -> eq y x) 
-          state_array)) 
-        (Array.of_list sl)) 
+      (
+        fun sl-> Array.map (
+          fun x -> myGet fallback (Array.find_index (fun y -> eq y x) state_array)
+        ) (Array.of_list sl)
+      ) 
       (Array.of_list table)  
     in
     let rec aux_filter = function 

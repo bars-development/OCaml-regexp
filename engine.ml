@@ -1,7 +1,103 @@
 open Regular_expressions
 open RE2
 
-let parse_expression exp = failwith "tto"
+type token = 
+  Symbol of char 
+  | Bar
+  | Kleene_star
+  | Plus 
+  | Question_mark 
+  | Left_paren
+  | Right_paren 
+  | Dot
+  | Left_bracket (*To be implemented later*)
+  | Right_bracket
+  | Backslash 
+let get_token= function 
+  | '|'-> Bar
+  | '*'-> Kleene_star
+  | '+'-> Plus
+  | '?'-> Question_mark
+  | '('-> Left_paren
+  | ')'-> Right_paren 
+  | '.'-> Dot
+  | '{'-> Left_bracket
+  | '}'-> Right_bracket
+  | '\\'-> Backslash
+  | c -> Symbol c
+
+let tokenize s = 
+  let rec aux i acc  =
+    if(i=String.length s) then acc
+    else
+      let char = String.get s i in 
+      let token = get_token char in 
+      match token with
+        | Backslash -> aux (i+2) ((Symbol (String.get s (i+1)))::acc)
+        | _-> aux (i+1) (token::acc)
+  in List.rev (aux 0 [])
+
+(* Recursive Descent Parsing *)
+
+let rdp tokens= 
+  let mtch t l = (List.hd l)= t
+  in
+  let union lst= 
+    let rec aux left acc  =
+      match left with
+      | []->acc
+      | h::t -> aux t (Union (acc, h))
+    in aux lst Empty
+  in
+  let symbol2character s = match s with
+    |Symbol s-> Character (C s)
+    |Dot -> union (List.map (fun x-> Character x) ascii)
+    |_ -> failwith "Error: Invalid input"
+  in
+  let rec main t= 
+    let before, rest = expr t in 
+    if(List.is_empty rest || (List.hd rest) <>  Bar) then (before, rest)
+    else
+      let new_expr, new_rest = main (List.tl rest )in 
+      (Union (before, new_expr), new_rest)  
+  and expr t= 
+    let before, rest = factor t in 
+    if(List.is_empty rest || mtch Bar rest|| mtch Right_paren rest|| mtch Kleene_star rest) then (before, rest)
+    else 
+        let new_expr, new_rest = expr rest in 
+        (Product (before, new_expr), new_rest)
+  and factor t= 
+      let before, rest = simple t in 
+      if(List.is_empty rest) then (before, rest) else
+      if mtch Kleene_star rest then
+          (Star before, List.tl rest)
+      else if mtch Plus rest then
+        (Product(before, Star before), List.tl rest)
+      else if mtch Question_mark rest then 
+        (Union(before, Eps), List.tl rest)
+      else (before, rest)
+  and simple t= 
+      if(t=[]) then (Eps, [])else
+      if(List.hd t)=Left_paren then 
+        begin
+          let expression, rest = main (List.tl t) in 
+          if not (mtch Right_paren rest)
+            then failwith "error: invalid parentheses"
+          else 
+            (expression, List.tl rest)
+        end
+      else
+        let res = symbol2character (List.hd t) in 
+        (res, List.tl t)
+  in 
+  let res, rest= main tokens in
+  if(rest<>[]) then 
+    failwith "Parsing error" 
+  else
+  res
+
+    
+let parse_expression exp = rdp (tokenize exp)
 
 let create_machine s = construct_dfa (parse_expression s) ascii
 
