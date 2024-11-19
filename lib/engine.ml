@@ -1,5 +1,4 @@
 open Rege
-open RE2
 
 type token = 
   Symbol of char 
@@ -38,7 +37,6 @@ let tokenize s =
   in List.rev (aux 0 [])
 
 (* Recursive Descent Parsing *)
-
 let rdp tokens= 
   let mtch t l = (List.hd l)= t
   in
@@ -96,23 +94,36 @@ let rdp tokens=
   else
   res
 
-    
 let parse_expression exp = rdp (tokenize exp)
 
-let create_machine s = construct_dfa (parse_expression s) ascii
+module type REEngine = sig
+  type machine
+  val create_machine:  ?alphabet:char_expr list -> string ->machine
+  val match_expression: machine->string->bool
+end
 
-let match_expression machine input = 
-  let split_string_chars s  = List.init (String.length s) (String.get s) in
+module MakeEngine (R : Impl) : REEngine= struct
+  open R
+  type machine = dfa_structure
+  let create_machine ?(alphabet=ascii) s = construct_dfa (parse_expression s) alphabet
 
-  let next_dfa_state state_ind trigger = 
-    let trigger_ind = List.find_index (fun x -> x=trigger) machine.dfa_alphabet  in
-    if(Option.is_none trigger_ind) then  
-      failwith "Character not in alphabet" 
-    else
-      machine.table.(state_ind).(Option.get trigger_ind)
-  in 
-  let rec aux state_ind = function
-    | _ when machine.dfa_states.(state_ind)=empty -> false
-    | []-> Mylist.search (machine.dfa_states.(state_ind)) machine.accept eq
-    | h::t -> aux (next_dfa_state state_ind (C h)) t
-  in aux (Array.length machine.dfa_states-1) (split_string_chars input) 
+  let match_expression machine input = 
+    let split_string_chars s  = List.init (String.length s) (String.get s) in
+
+    let next_dfa_state state_ind trigger = 
+      let trigger_ind = List.find_index (fun x -> x=trigger) machine.dfa_alphabet  in
+      if(Option.is_none trigger_ind) then  
+        failwith "Unknown character encountered" 
+      else
+        machine.table.(state_ind).(Option.get trigger_ind)
+    in 
+    let rec aux state_ind = function
+      | _ when machine.dfa_states.(state_ind)=empty -> false
+      | []-> Mylist.search (machine.dfa_states.(state_ind)) machine.accept eq
+      | h::t -> aux (next_dfa_state state_ind (C h)) t
+    in aux (Array.length machine.dfa_states-1) (split_string_chars input) 
+end
+
+
+module Engine1:REEngine = MakeEngine(RE1)
+module Engine2:REEngine = MakeEngine(RE2)
