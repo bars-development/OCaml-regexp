@@ -15,8 +15,8 @@ module type Impl = sig
   type dfa_structure = {
     dfa_alphabet: char_expr list;
     dfa_states: dfa_state array;
-    dfa_start: dfa_state;
-    accept: dfa_state list;
+    dfa_start: int;
+    accept: int list;
     table: int array array;
   }
   val empty: dfa_state
@@ -71,8 +71,8 @@ module RE2:Impl= struct
   type dfa_structure = {
     dfa_alphabet: char_expr list;
     dfa_states: dfa_state array;
-    dfa_start: dfa_state;
-    accept: dfa_state list;
+    dfa_start: int;
+    accept: int list;
     table: int array array;
   }
 
@@ -144,14 +144,14 @@ module RE2:Impl= struct
     {
       dfa_alphabet = alphabet;
       dfa_states = state_array;
-      dfa_start = exp;
-      accept = List.filter aux_filter states;
+      dfa_start = Option.get (Array.find_index (fun x-> eq x exp) state_array);
+      accept = List.map (fun y->Option.get (Array.find_index (fun x-> eq x y) state_array) ) ( List.filter aux_filter states);
       table = simplified_table
     }
 
 end
 
-module RE1:Impl = struct 
+module RE1:Impl= struct 
   (* First step: Expression -> NFA *)
   type state = int
   type transition = state*char_expr*state
@@ -168,7 +168,7 @@ module RE1:Impl = struct
     } in
     let rec convert_expr_to_nfa shift= function
       | Empty -> {empty with last=1} 
-      | Eps -> empty
+      | Eps -> {empty with start=shift; last=shift}
       | Character a -> 
         { 
           start=shift;
@@ -235,8 +235,8 @@ module RE1:Impl = struct
   type dfa_structure = {
     dfa_alphabet : char_expr list;
     dfa_states : dfa_state array;
-    dfa_start : dfa_state;
-    accept : dfa_state list;
+    dfa_start : int;
+    accept : int list;
     table : int array array;
   }
   let empty = []
@@ -265,15 +265,15 @@ module RE1:Impl = struct
     let simplified_table = Array.of_list (
       List.map (fun sl-> 
         Array.map (fun x -> 
-          Option.get (Array.find_index (fun y -> y=x) 
+          Option.get (Array.find_index (fun y -> eq y x) 
           state_array)) 
         (Array.of_list sl)) 
       table)  in  
     {
       dfa_alphabet=alphabet;
       dfa_states = state_array;
-      dfa_start= epsilon_closure nfa.start nfa.transitions;
-      accept=List.filter (fun l-> contains_state l nfa.last) states;
+      dfa_start= Option.get (Array.find_index (fun x->eq x (epsilon_closure nfa.start nfa.transitions)) state_array );
+      accept=List.map (fun y -> Option.get (Array.find_index (fun x-> eq x y) state_array)) (List.filter (fun l-> contains_state l nfa.last) states);
       table=simplified_table
     }
 
