@@ -118,7 +118,7 @@ module MakeEngine (R : Impl) : REEngine= struct
         machine.table.(state_ind).(Option.get trigger_ind)
     in 
     let rec aux state_ind = function
-      | _ when machine.dfa_states.(state_ind)=empty -> false
+      | _ when state_ind=machine.empty -> false
       | []-> Mylist.search state_ind machine.accept (=)
       | h::t -> aux (next_dfa_state state_ind (C h)) t
     in aux machine.dfa_start (split_string_chars input) 

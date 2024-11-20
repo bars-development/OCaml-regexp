@@ -14,13 +14,11 @@ module type Impl = sig
   type dfa_state
   type dfa_structure = {
     dfa_alphabet: char_expr list;
-    dfa_states: dfa_state array;
     dfa_start: int;
     accept: int list;
+    empty: int;
     table: int array array;
   }
-  val empty: dfa_state
-  val eq: dfa_state->dfa_state->bool
   val construct_dfa: regex_expr -> char_expr list -> dfa_structure
 end
 
@@ -70,13 +68,12 @@ module RE2:Impl= struct
 
   type dfa_structure = {
     dfa_alphabet: char_expr list;
-    dfa_states: dfa_state array;
+    (* dfa_states: dfa_state array; *)
     dfa_start: int;
     accept: int list;
+    empty: int;
     table: int array array;
   }
-
-  let empty = Empty
    let rec eq exp1 exp2 = match simplify exp1 with
     | Eps -> begin 
       match  exp2 with
@@ -143,9 +140,10 @@ module RE2:Impl= struct
     in
     {
       dfa_alphabet = alphabet;
-      dfa_states = state_array;
+      (* dfa_states = state_array; *)
       dfa_start = Option.get (Array.find_index (fun x-> eq x exp) state_array);
       accept = List.map (fun y->Option.get (Array.find_index (fun x-> eq x y) state_array) ) ( List.filter aux_filter states);
+      empty = Option.get (Array.find_index (fun x->eq x Empty) state_array);
       table = simplified_table
     }
 
@@ -234,9 +232,10 @@ module RE1:Impl= struct
     
   type dfa_structure = {
     dfa_alphabet : char_expr list;
-    dfa_states : dfa_state array;
+    (* dfa_states : dfa_state array; *)
     dfa_start : int;
     accept : int list;
+    empty: int;
     table : int array array;
   }
   let empty = []
@@ -271,9 +270,10 @@ module RE1:Impl= struct
       table)  in  
     {
       dfa_alphabet=alphabet;
-      dfa_states = state_array;
+      (* dfa_states = state_array; *)
       dfa_start= Option.get (Array.find_index (fun x->eq x (epsilon_closure nfa.start nfa.transitions)) state_array );
       accept=List.map (fun y -> Option.get (Array.find_index (fun x-> eq x y) state_array)) (List.filter (fun l-> contains_state l nfa.last) states);
+      empty = Option.get (Array.find_index (fun x->x=empty) state_array);
       table=simplified_table
     }
 
