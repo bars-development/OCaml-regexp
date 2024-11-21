@@ -158,6 +158,64 @@ let plusandQuestionTests = [
     ]);
 ]
 
+let rangeOperatorTests = [
+    ("[a-c]", [
+        "a", true;
+        "b", true;
+        "c", true;
+        "d", false;
+        "ac", false;
+        "", false;
+    ]);
+    ("[a-z]+", [
+        "abc", true;
+        "xyz", true;
+        "a", true;
+        "", false;
+        "1", false;
+        "abc1", false;
+    ]);
+     ("[0-9]?", [
+        "1", true;
+        "", true;
+        "9", true;
+        "10", false;
+        "a", false;
+    ]);
+    ("[a-d]*", [
+        "", true;
+        "a", true;
+        "ab", true;
+        "abcd", true;
+        "e", false;
+        "abcde", false;
+    ]);
+    ("[a-m]+n", [
+        "an", true;
+        "bmn", true;
+        "aaabmn", true;
+        "n", false;
+        "amn", true;
+        "amnz", false;
+    ]);
+    ("[a-c]?d", [
+        "ad", true;
+        "bd", true;
+        "cd", true;
+        "d", true;
+        "abcd", false;
+        "", false;
+    ]);
+    ("[a-zA-Z]+", [
+        "abc", true;
+        "ABC", true;
+        "aBcDe", true;
+        "123", false;
+        "a1", false;
+        "", false;
+    ]); 
+]
+
 let mtch match_expression create_machine tests exp= 
     let matcher = match_expression (create_machine exp) in
     List.iter (fun x ->match x with  input, expected -> assert_equal (matcher input ) expected) tests
@@ -169,7 +227,7 @@ let run l engine=
                 mtch Engine1.match_expression Engine1.create_machine tests exp;
             end
             else if (engine=2) then begin
-                mtch Engine1.match_expression Engine1.create_machine tests exp;
+                mtch Engine2.match_expression Engine2.create_machine tests exp;
             end
             else failwith "Engine not found"
     ) l
@@ -179,12 +237,15 @@ let tests1 = "test suite for RE 1" >::: [
   "Union tests">:: run unionTests 1;
   "Star tests">:: run starTests 1;
   "Plus and Question Tests">:: run plusandQuestionTests 1;
+  (* "Range operator">:: run rangeOperatorTests 1; *)
 ]
 let tests2 = "test suite for RE 2" >::: [
   "simple" >:: run simpleTests 2;
   "Union tests">:: run unionTests 2;
   "Star tests">:: run starTests 2;
   "Plus and Question Tests">:: run plusandQuestionTests 2;
+  "Range operator">:: run rangeOperatorTests 2;
+
 ]
 
-let _ = run_test_tt_main tests1; run_test_tt_main tests2
+let _ = run_test_tt_main tests1; run_test_tt_main tests2; 

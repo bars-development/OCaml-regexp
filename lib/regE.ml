@@ -25,7 +25,7 @@ module type Impl = sig
 end
 
 module RE2:Impl= struct
-  (* [simplify expr] simplifyes the [expr] expression, and flattens right the product expressions*)
+  (** [simplify expr] simplifyes the [expr] expression, and flattens right the product expressions*)
   let rec simplify expr =
     match expr with
     | Product (a, b) when a=Eps -> simplify b
@@ -41,7 +41,7 @@ module RE2:Impl= struct
     | Star a -> Star (simplify a)
     | _ -> expr
  
-  (* [derivate expr char] Calculates the Brzozowski derivative of [expr] with respect to [char] *)
+  (** [derivate expr char] Calculates the Brzozowski derivative of [expr] with respect to [char] *)
   let rec derivate exp char= 
     let rec nullable r =
       match r with
@@ -74,7 +74,7 @@ module RE2:Impl= struct
     table: LookupTable.lookupTable;
   }
   
-  (* [eq expr1 expr2] returns true if [expr1] and [expr2] are equivalent regular expressions*)
+  (** [eq expr1 expr2] returns true if [expr1] and [expr2] are equivalent regular expressions*)
   let rec eq exp1 exp2 = match simplify exp1 with
     | Eps -> begin 
       match  exp2 with
@@ -142,20 +142,20 @@ end
 
 module RE1:Impl= struct 
 
-  (* Defines a type a state in NFA *)
+  (** Defines a type a state in NFA *)
   type state = int
   
-  (* Defines a type to denote a NFA transition *)
+  (** Defines a type to denote a NFA transition *)
   type transition = state*char_expr*state
   
-  (* Defines a structure for storing NFA representation of a regular expression *)
+  (** Defines a structure for storing NFA representation of a regular expression *)
   type nfa_struct = {
     start: state;
     last: state;
     transitions: transition list;
   }
   
-  (* [regex_to_nfa expr] converts [expr] to a NFA *)
+  (** [regex_to_nfa expr] converts [expr] to a NFA *)
   let regex_to_nfa expr= 
     let empty = {
         start = 0;
@@ -196,7 +196,7 @@ module RE1:Impl= struct
         }
       in convert_expr_to_nfa 0 expr
   
-  (* [find_direct_transition n trigger lst acc] calculates the set of all states that can be reached from the given node [n] with the trigger [trigger] given the transition list [lst] and stores value in [acc]*)
+  (** [find_direct_transition n trigger lst acc] calculates the set of all states that can be reached from the given node [n] with the trigger [trigger] given the transition list [lst] and stores value in [acc]*)
   let rec find_direct_transition n trigger lst acc= 
     match lst with
       | [] -> ()
@@ -205,7 +205,7 @@ module RE1:Impl= struct
         find_direct_transition n trigger t acc
       | _::t -> find_direct_transition n trigger t acc 
 
-  (* [epsilon_closure node transitions l] calculates the epsilon closure of the [node] given the transition table [transitions] and the number of states in the NFA [l] *)
+  (** [epsilon_closure node transitions l] calculates the epsilon closure of the [node] given the transition table [transitions] and the number of states in the NFA [l] *)
   let epsilon_closure node transitions l= 
     let rec aux tbc acc = 
       if(Bitarray.is_empty tbc) then ()
@@ -224,7 +224,7 @@ module RE1:Impl= struct
       aux tbc acc;
       acc
   
-  (* [apply_transition_for_nfa n trigger transitions l] returns the list of states that can be reached from [n] with trigger [trigger] given the transitions table [transitions] and the number of states in the NFA [l]*)
+  (** [apply_transition_for_nfa n trigger transitions l] returns the list of states that can be reached from [n] with trigger [trigger] given the transitions table [transitions] and the number of states in the NFA [l]*)
   let apply_transition_for_nfa n trigger transitions l= 
     let enc = epsilon_closure n transitions l in 
     let dir = Bitarray.fold_left (fun acc x -> 
@@ -241,7 +241,7 @@ module RE1:Impl= struct
     table : LookupTable.lookupTable;
   }
 
-  (* [apply_for_dfa s trigger nfa] calculates the state reached from state [s] with trigger [trigger] given the NFA [nfa] *)
+  (** [apply_for_dfa s trigger nfa] calculates the state reached from state [s] with trigger [trigger] given the NFA [nfa] *)
   let apply_for_dfa s trigger nfa = 
     let res = Bitarray.fold_left (fun acc x -> (Bitarray.merge (apply_transition_for_nfa x trigger nfa.transitions (nfa.last+1)) acc)) (Bitarray.empty (nfa.last+1)) s in
     Bitarray.fold_left (fun acc v->  Bitarray.merge (epsilon_closure v nfa.transitions (nfa.last+1)) acc) (Bitarray.empty (nfa.last+1)) res
