@@ -1,7 +1,6 @@
 open OUnit2
 open Lib.Engine
 
-
 let simpleTests = [
     ("aaab", [
         "aaab", true;

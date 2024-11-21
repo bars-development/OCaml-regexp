@@ -1,29 +1,31 @@
 open Utils
 
 type char_expr = Epsilon | C of char
-  (* Ordinary regular expression *)
+
 type regex_expr = 
-  | Empty                             (*Denotes the empty set*)
-  | Eps                               (*Denotes empty string*)
-  | Character of char_expr            (*Denotes a single character*)
-  | Union of regex_expr*regex_expr    (*Denotes a union of regular expressions i.e. first or the second*)
-  | Product of regex_expr*regex_expr  (*Denotes a product of regular expressions i.e. first followed by the second *)
+  | Empty                            
+  | Eps                               
+  | Character of char_expr           
+  | Union of regex_expr*regex_expr    
+  | Product of regex_expr*regex_expr  
   | Star of regex_expr                
 
 let ascii = List.init 255 (fun c -> C (Char.chr c))
 
 module type Impl = sig
+
   type dfa_structure = {
     dfa_alphabet: char_expr list;
-    dfa_start: int;
+    start: int;
     accept: int list;
     empty: int;
-    table: int array array;
+    table: LookupTable.lookupTable;
   }
   val construct_dfa: regex_expr -> char_expr list -> dfa_structure
 end
 
 module RE2:Impl= struct
+  (* [simplify expr] simplifyes the [expr] expression, and flattens right the product expressions*)
   let rec simplify expr =
     match expr with
     | Product (a, b) when a=Eps -> simplify b
@@ -33,13 +35,13 @@ module RE2:Impl= struct
       let na = simplify a in 
       let nb = simplify b in 
       if(na=nb) then na else if(na=Empty) then nb else if (nb=Empty) then na else Union (na, nb)
-    | Product (a, Product (b, c)) -> 
-        simplify (Product (Product (a, b), c)) (* Flatten left *)
+    | Product (Product (a, b), c) -> 
+        simplify (Product(a, Product (b, c)) ) (* Flatten right *)
     | Product (a, b) -> Product (simplify a, simplify b)
-    (* | Not a -> Not (reduce a) *)
     | Star a -> Star (simplify a)
     | _ -> expr
  
+  (* [derivate expr char] Calculates the Brzozowski derivative of [expr] with respect to [char] *)
   let rec derivate exp char= 
     let rec nullable r =
       match r with
@@ -64,18 +66,16 @@ module RE2:Impl= struct
         simplify (Product (derivate a char, b))
     | Star a -> simplify (Product(derivate a char, Star a))
   
-  (* DFA construction *) 
-  (* type dfa_state = regex_expr *)
-
   type dfa_structure = {
     dfa_alphabet: char_expr list;
-    (* dfa_states: dfa_state array; *)
-    dfa_start: int;
+    start: int;
     accept: int list;
     empty: int;
-    table: int array array;
+    table: LookupTable.lookupTable;
   }
-   let rec eq exp1 exp2 = match simplify exp1 with
+  
+  (* [eq expr1 expr2] returns true if [expr1] and [expr2] are equivalent regular expressions*)
+  let rec eq exp1 exp2 = match simplify exp1 with
     | Eps -> begin 
       match  exp2 with
         | Eps -> true
@@ -109,9 +109,7 @@ module RE2:Impl= struct
           | Product (c, d) when eq a c && eq b d->true
           | _ -> false
       end
-  let myGet = function
-      |Some x-> x
-      |None -> failwith "Error"
+  
   let construct_dfa exp alphabet = 
     let rec compute_dfa_states st seen result = 
       if search st seen eq
@@ -122,14 +120,7 @@ module RE2:Impl= struct
     in
     let (states, table) = compute_dfa_states exp [] [] in
     let state_array = Array.of_list states in 
-    let simplified_table = Array.map 
-      (
-        fun sl-> Array.map (
-          fun x -> myGet (Array.find_index (fun y -> eq y x) state_array)
-        ) (Array.of_list sl)
-      ) 
-      (Array.of_list table)  
-    in
+    let simplified_table = LookupTable.construct_table table state_array eq in
     let rec aux_filter = function 
       | Empty -> false
       | Character _-> false
@@ -141,8 +132,7 @@ module RE2:Impl= struct
     in
     {
       dfa_alphabet = alphabet;
-      (* dfa_states = state_array; *)
-      dfa_start = Option.get (Array.find_index (fun x-> eq x exp) state_array);
+      start = Option.get (Array.find_index (fun x-> eq x exp) state_array);
       accept = List.map (fun y->Option.get (Array.find_index (fun x-> eq x y) state_array) ) ( List.filter aux_filter states);
       empty = Option.get (Array.find_index (fun x->eq x Empty) state_array);
       table = simplified_table
@@ -151,15 +141,22 @@ module RE2:Impl= struct
 end
 
 module RE1:Impl= struct 
-  (* First step: Expression -> NFA *)
+
+  (* Defines a type a state in NFA *)
   type state = int
+  
+  (* Defines a type to denote a NFA transition *)
   type transition = state*char_expr*state
+  
+  (* Defines a structure for storing NFA representation of a regular expression *)
   type nfa_struct = {
     start: state;
     last: state;
     transitions: transition list;
   }
-  let regex_to_nfa = 
+  
+  (* [regex_to_nfa expr] converts [expr] to a NFA *)
+  let regex_to_nfa expr= 
     let empty = {
         start = 0;
         last = 0;
@@ -197,9 +194,9 @@ module RE1:Impl= struct
           last = nfa1.last+1;
           transitions = (shift,Epsilon, shift+1)::(shift, Epsilon, nfa1.last+1)::(nfa1.last, Epsilon, shift)::nfa1.transitions  
         }
-      in convert_expr_to_nfa 0
+      in convert_expr_to_nfa 0 expr
   
-  (* Second step helper functions *)
+  (* [find_direct_transition n trigger lst acc] calculates the set of all states that can be reached from the given node [n] with the trigger [trigger] given the transition list [lst] and stores value in [acc]*)
   let rec find_direct_transition n trigger lst acc= 
     match lst with
       | [] -> ()
@@ -208,7 +205,7 @@ module RE1:Impl= struct
         find_direct_transition n trigger t acc
       | _::t -> find_direct_transition n trigger t acc 
 
-  (* Calculates the epsilon closure of the node (All possible states that could be reached by using only epsilon moves from the given node) *)
+  (* [epsilon_closure node transitions l] calculates the epsilon closure of the [node] given the transition table [transitions] and the number of states in the NFA [l] *)
   let epsilon_closure node transitions l= 
     let rec aux tbc acc = 
       if(Bitarray.is_empty tbc) then ()
@@ -226,7 +223,8 @@ module RE1:Impl= struct
       let acc = Bitarray.empty l in 
       aux tbc acc;
       acc
-
+  
+  (* [apply_transition_for_nfa n trigger transitions l] returns the list of states that can be reached from [n] with trigger [trigger] given the transitions table [transitions] and the number of states in the NFA [l]*)
   let apply_transition_for_nfa n trigger transitions l= 
     let enc = epsilon_closure n transitions l in 
     let dir = Bitarray.fold_left (fun acc x -> 
@@ -235,46 +233,35 @@ module RE1:Impl= struct
       Bitarray.merge acc res) (Bitarray.empty l) enc in
     Bitarray.fold_left (fun acc x -> Bitarray.merge acc (epsilon_closure x transitions l)) (Bitarray.empty l) dir
   
-  (* Second step nfa -> dfa *)
-  
-    
   type dfa_structure = {
     dfa_alphabet : char_expr list;
-    dfa_start : int;
+    start : int;
     accept : int list;
     empty: int;
-    table : int array array;
+    table : LookupTable.lookupTable;
   }
-  (* let empty = [] *)
-  let eq = Bitarray.eq
-  let apply_for_dfa s trigger nfa = 
 
+  (* [apply_for_dfa s trigger nfa] calculates the state reached from state [s] with trigger [trigger] given the NFA [nfa] *)
+  let apply_for_dfa s trigger nfa = 
     let res = Bitarray.fold_left (fun acc x -> (Bitarray.merge (apply_transition_for_nfa x trigger nfa.transitions (nfa.last+1)) acc)) (Bitarray.empty (nfa.last+1)) s in
     Bitarray.fold_left (fun acc v->  Bitarray.merge (epsilon_closure v nfa.transitions (nfa.last+1)) acc) (Bitarray.empty (nfa.last+1)) res
 
   let construct_dfa expr alphabet=
     let nfa = regex_to_nfa expr in
     let rec compute_dfa_states st seen result = 
-      if search st seen eq then (seen, result)
+      if search st seen Bitarray.eq then (seen, result)
       else 
         let to_alph = List.map (fun a -> apply_for_dfa st a nfa ) alphabet in
         List.fold_left  (fun (seen, result) x ->  compute_dfa_states x seen result) (st::seen, to_alph::result) to_alph
       in
     let (states, table) = compute_dfa_states (epsilon_closure nfa.start nfa.transitions (nfa.last+1)) [] [] in
     let state_array = Array.of_list states in 
-
-    let simplified_table = Array.of_list (
-      List.map (fun sl-> 
-        Array.map (fun x -> 
-          Option.get (Array.find_index (fun y -> eq y x) 
-          state_array)) 
-        (Array.of_list sl)) 
-      table)  in  
+    let simplified_table = LookupTable.construct_table table state_array Bitarray.eq in
 
     {
       dfa_alphabet=alphabet;
-      dfa_start= Option.get (Array.find_index (fun x->eq x (epsilon_closure nfa.start nfa.transitions (nfa.last+1))) state_array );
-      accept=List.map (fun y -> Option.get (Array.find_index (fun x-> eq x y) state_array)) (List.filter (fun l-> Bitarray.contains nfa.last l) states);
+      start= Option.get (Array.find_index (fun x->Bitarray.eq x (epsilon_closure nfa.start nfa.transitions (nfa.last+1))) state_array );
+      accept=List.map (fun y -> Option.get (Array.find_index (fun x-> Bitarray.eq x y) state_array)) (List.filter (fun l-> Bitarray.contains nfa.last l) states);
       empty = Option.get (Array.find_index (fun x->Bitarray.is_empty x) state_array);
       table=simplified_table
     }

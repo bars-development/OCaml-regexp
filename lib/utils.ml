@@ -1,4 +1,5 @@
 module Bitarray = struct
+  type t = bytes
   let empty n = 
     let size =(n+7)/8 in  
     Bytes.create size
@@ -9,21 +10,18 @@ module Bitarray = struct
       else nth_empty (index + 1)
     in
     nth_empty 0
-  
   let add value array = 
     let byte_index = value / 8 in
     let bit_index = value mod 8 in
     if(byte_index>=Bytes.length array) then failwith ((string_of_int (Bytes.length array))^"is the length of the array, got "^(string_of_int value)) else
     let byte = Bytes.get_uint8 array byte_index in
     Bytes.set_uint8 array byte_index (byte lor (1 lsl bit_index))
-
   let delete value array = 
     let byte_index = value / 8 in
     let bit_index = value mod 8 in
     let byte = Bytes.get_uint8 array byte_index in
     Bytes.set_uint8 array byte_index (byte land (lnot (1 lsl bit_index)))
   let eq = Bytes.equal
-
   let hd array= 
 
     let rec aux index =
@@ -47,15 +45,11 @@ module Bitarray = struct
     let r = hd array in
     delete r array;
     r
-
-
   let contains value array =
     let byte_index = value / 8 in
     let bit_index = value mod 8 in
     let byte = Bytes.get_uint8 array byte_index in
     (byte land (1 lsl bit_index)) <> 0
-
-
   let merge a b = 
     let s = Bytes.length a in
     let result = Bytes.create s in 
@@ -63,14 +57,12 @@ module Bitarray = struct
       Bytes.set_uint8 result i ((Bytes.get_uint8 a i) lor (Bytes.get_uint8 b i))
     done;
     result
-  
   let exclude_from a b = 
     let s = Bytes.length a in
     for i=0 to s-1 do
       Bytes.set_uint8 a i (((Bytes.get_uint8 a i) lxor (Bytes.get_uint8 b i)) land (Bytes.get_uint8 a i))
     done;
     ()
-  
   let fold_left f init array = 
     let acc = ref init in
     for i=0 to (Bytes.length array)-1 do
@@ -80,7 +72,7 @@ module Bitarray = struct
       done;
     done;
     !acc
-  let from_list l len= 
+  (* let from_list l len= 
     let res = empty len in
     let rec aux lst=
       match lst with
@@ -97,7 +89,7 @@ module Bitarray = struct
         if(contains (i*8+j) array) then l := (i*8+j)::!l;
       done;
     done;
-    List.rev !l
+    List.rev !l *)
 
 end
 
@@ -125,6 +117,40 @@ module MyList = struct
         if(h1>h2) then add h2 (mergeSorted t2 lst1) else add h1 (mergeSorted lst2 t1)
 
 
+end
+
+module LookupTable = struct
+  type lookupTable = {
+    entries:int array array;
+    mapping:int array;
+  }
+  let construct_table table state_array eq= 
+    let find v lst = 
+      let rec aux lst i = match lst with
+        | [] -> (-1)
+        | h::_ when h=v->i
+        | _::t -> aux t (i+1)
+      in aux lst 0
+    in
+    let toArray lst= Array.map (fun x -> 
+      Option.get (Array.find_index (fun y -> eq y x) 
+        state_array)) (Array.of_list lst) in
+    let rec aux table entries mapping =match table with
+      |[] -> (List.rev entries, List.rev mapping)
+      |h::t -> 
+        let i = (List.length entries) - (find h entries) -1 in
+        if i <> List.length entries then 
+          aux t entries (i::mapping)
+        else
+          aux t (h::entries) (i::mapping)
+    in
+    let (entries, mapping) = aux table [] [] in
+    {
+      entries = Array.map (fun x->toArray x) (Array.of_list entries);
+      mapping = Array.of_list mapping 
+    }
+  
+  let get table i j= table.entries.(table.mapping.(i)).(j)
 end
 
 let rec search state state_list equality= 

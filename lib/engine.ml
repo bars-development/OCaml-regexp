@@ -1,7 +1,7 @@
 open Utils
-open Rege
+open RegE
 
-
+(* Defines a token type for parsing regular expressions from strings *)
 type token = 
   Symbol of char 
   | Bar
@@ -14,6 +14,7 @@ type token =
   | Left_bracket (*To be implemented later*)
   | Right_bracket
   | Backslash 
+(* Defines a char-> token mapping *)
 let get_token= function 
   | '|'-> Bar
   | '*'-> Kleene_star
@@ -27,6 +28,7 @@ let get_token= function
   | '\\'-> Backslash
   | c -> Symbol c
 
+(* [tokenize s] returns a list of tokens to represent the string [s] defining a regular expression*)
 let tokenize s = 
   let rec aux i acc  =
     if(i=String.length s) then acc
@@ -38,7 +40,7 @@ let tokenize s =
         | _-> aux (i+1) (token::acc)
   in List.rev (aux 0 [])
 
-(* Recursive Descent Parsing *)
+(* [rdp tokens] given token list representing the regexp string [tokens] returns a regexp_expr representation of the regular expression *)
 let rdp tokens= 
   let mtch t l = (List.hd l)= t
   in
@@ -82,7 +84,7 @@ let rdp tokens=
         begin
           let expression, rest = main (List.tl t) in 
           if not (mtch Right_paren rest)
-            then failwith "error: invalid parentheses"
+            then failwith "Error: invalid parentheses"
           else 
             (expression, List.tl rest)
         end
@@ -115,15 +117,15 @@ module MakeEngine (R : Impl) : REEngine= struct
     let next_dfa_state state_ind trigger = 
       let trigger_ind = List.find_index (fun x -> x=trigger) machine.dfa_alphabet  in
       if(Option.is_none trigger_ind) then  
-        failwith "Unknown character encountered" 
+        failwith "Character not in the alphabet" 
       else
-        machine.table.(state_ind).(Option.get trigger_ind)
+        LookupTable.get machine.table (state_ind) (Option.get trigger_ind)
     in 
     let rec aux state_ind = function
       | _ when state_ind=machine.empty -> false
       | []-> search state_ind machine.accept (=)
       | h::t -> aux (next_dfa_state state_ind (C h)) t
-    in aux machine.dfa_start (split_string_chars input) 
+    in aux machine.start (split_string_chars input) 
 end
 
 

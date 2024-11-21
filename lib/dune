@@ -1,3 +1,3 @@
 (library
   (name lib)
-  (modules utils rege engine))
+  (modules utils regE engine))
