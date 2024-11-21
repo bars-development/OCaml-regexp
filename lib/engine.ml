@@ -1,4 +1,6 @@
+open Utils
 open Rege
+
 
 type token = 
   Symbol of char 
@@ -119,7 +121,7 @@ module MakeEngine (R : Impl) : REEngine= struct
     in 
     let rec aux state_ind = function
       | _ when state_ind=machine.empty -> false
-      | []-> Mylist.search state_ind machine.accept (=)
+      | []-> search state_ind machine.accept (=)
       | h::t -> aux (next_dfa_state state_ind (C h)) t
     in aux machine.dfa_start (split_string_chars input) 
 end

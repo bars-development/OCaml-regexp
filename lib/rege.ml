@@ -1,3 +1,5 @@
+open Utils
+
 type char_expr = Epsilon | C of char
   (* Ordinary regular expression *)
 type regex_expr = 
@@ -11,7 +13,6 @@ type regex_expr =
 let ascii = List.init 255 (fun c -> C (Char.chr c))
 
 module type Impl = sig
-  type dfa_state
   type dfa_structure = {
     dfa_alphabet: char_expr list;
     dfa_start: int;
@@ -64,7 +65,7 @@ module RE2:Impl= struct
     | Star a -> simplify (Product(derivate a char, Star a))
   
   (* DFA construction *) 
-  type dfa_state = regex_expr
+  (* type dfa_state = regex_expr *)
 
   type dfa_structure = {
     dfa_alphabet: char_expr list;
@@ -113,7 +114,7 @@ module RE2:Impl= struct
       |None -> failwith "Error"
   let construct_dfa exp alphabet = 
     let rec compute_dfa_states st seen result = 
-      if Mylist.search st seen eq
+      if search st seen eq
         then  (seen, result)
       else 
         let to_alph = List.map (fun l -> derivate st l) alphabet in
@@ -201,66 +202,67 @@ module RE1:Impl= struct
   (* Second step helper functions *)
   let rec find_direct_transition n trigger lst acc= 
     match lst with
-      | [] -> acc
-      | (a, b, c)::t when a=n && b=trigger-> find_direct_transition n trigger t (Mylist.add c acc)
+      | [] -> ()
+      | (a, b, c)::t when a=n && b=trigger-> 
+        Bitarray.add c acc;
+        find_direct_transition n trigger t acc
       | _::t -> find_direct_transition n trigger t acc 
 
   (* Calculates the epsilon closure of the node (All possible states that could be reached by using only epsilon moves from the given node) *)
-  let epsilon_closure node transitions = 
-    let delete_all_from a b= 
-      let rec aux lst acc = 
-        match lst with 
-          |[] -> acc
-          |h::t -> if (Mylist.isInSorted h a) then aux t acc else aux t (h::acc)
-      in aux b [] in
+  let epsilon_closure node transitions l= 
     let rec aux tbc acc = 
-      if(tbc=[]) then acc else
-      let d = find_direct_transition (List.hd tbc) Epsilon transitions [] in
-      let d2 = delete_all_from acc d in 
-      let new_tbc = Mylist.mergeSorted (List.tl tbc) d2 in
-      aux new_tbc (Mylist.add (List.hd tbc) acc)
-      
-    in (aux [node] [])
+      if(Bitarray.is_empty tbc) then ()
+      else
+        let res = Bitarray.empty l in
+        find_direct_transition (Bitarray.hd tbc) Epsilon transitions res;
+        Bitarray.exclude_from res acc;
+        let n = Bitarray.pop_hd tbc in
+        let new_tbc = Bitarray.merge tbc res in
+        Bitarray.add n acc;
+        aux new_tbc acc
+    in 
+      let tbc = Bitarray.empty l in 
+      Bitarray.add node tbc;
+      let acc = Bitarray.empty l in 
+      aux tbc acc;
+      acc
 
-  let apply_transition_for_nfa n trigger transitions = 
-    let enc = epsilon_closure n transitions in 
-    let dir = List.fold_left (fun acc x -> Mylist.mergeSorted acc (find_direct_transition x trigger transitions [])) [] enc in
-    List.fold_left (fun acc x -> Mylist.mergeSorted acc (epsilon_closure x transitions)) [] dir
+  let apply_transition_for_nfa n trigger transitions l= 
+    let enc = epsilon_closure n transitions l in 
+    let dir = Bitarray.fold_left (fun acc x -> 
+      let res = Bitarray.empty l in 
+      find_direct_transition x trigger transitions res;
+      Bitarray.merge acc res) (Bitarray.empty l) enc in
+    Bitarray.fold_left (fun acc x -> Bitarray.merge acc (epsilon_closure x transitions l)) (Bitarray.empty l) dir
   
   (* Second step nfa -> dfa *)
-  type dfa_state = state list
+  
     
   type dfa_structure = {
     dfa_alphabet : char_expr list;
-    (* dfa_states : dfa_state array; *)
     dfa_start : int;
     accept : int list;
     empty: int;
     table : int array array;
   }
-  let empty = []
-  let eq = Mylist.eq
+  (* let empty = [] *)
+  let eq = Bitarray.eq
   let apply_for_dfa s trigger nfa = 
-    let rec res list acc = match list with
-      | [] -> acc
-      | h::t -> res t (Mylist.mergeSorted (apply_transition_for_nfa h trigger nfa.transitions) acc)
-    in List.fold_left (fun acc v->  Mylist.mergeSorted (epsilon_closure v nfa.transitions) acc) [] (res s [])
+
+    let res = Bitarray.fold_left (fun acc x -> (Bitarray.merge (apply_transition_for_nfa x trigger nfa.transitions (nfa.last+1)) acc)) (Bitarray.empty (nfa.last+1)) s in
+    Bitarray.fold_left (fun acc v->  Bitarray.merge (epsilon_closure v nfa.transitions (nfa.last+1)) acc) (Bitarray.empty (nfa.last+1)) res
 
   let construct_dfa expr alphabet=
     let nfa = regex_to_nfa expr in
     let rec compute_dfa_states st seen result = 
-      if Mylist.search st seen eq then (seen, result)
+      if search st seen eq then (seen, result)
       else 
         let to_alph = List.map (fun a -> apply_for_dfa st a nfa ) alphabet in
         List.fold_left  (fun (seen, result) x ->  compute_dfa_states x seen result) (st::seen, to_alph::result) to_alph
       in
-    let (states, table) = compute_dfa_states (epsilon_closure nfa.start nfa.transitions) [] [] in
+    let (states, table) = compute_dfa_states (epsilon_closure nfa.start nfa.transitions (nfa.last+1)) [] [] in
     let state_array = Array.of_list states in 
-    let rec contains_state l e = match l with
-      |[] -> false 
-      |h::_ when h=e -> true
-      |_::t -> contains_state t e
-    in
+
     let simplified_table = Array.of_list (
       List.map (fun sl-> 
         Array.map (fun x -> 
@@ -268,12 +270,12 @@ module RE1:Impl= struct
           state_array)) 
         (Array.of_list sl)) 
       table)  in  
+
     {
       dfa_alphabet=alphabet;
-      (* dfa_states = state_array; *)
-      dfa_start= Option.get (Array.find_index (fun x->eq x (epsilon_closure nfa.start nfa.transitions)) state_array );
-      accept=List.map (fun y -> Option.get (Array.find_index (fun x-> eq x y) state_array)) (List.filter (fun l-> contains_state l nfa.last) states);
-      empty = Option.get (Array.find_index (fun x->x=empty) state_array);
+      dfa_start= Option.get (Array.find_index (fun x->eq x (epsilon_closure nfa.start nfa.transitions (nfa.last+1))) state_array );
+      accept=List.map (fun y -> Option.get (Array.find_index (fun x-> eq x y) state_array)) (List.filter (fun l-> Bitarray.contains nfa.last l) states);
+      empty = Option.get (Array.find_index (fun x->Bitarray.is_empty x) state_array);
       table=simplified_table
     }
 
