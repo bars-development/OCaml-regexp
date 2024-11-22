@@ -1,1 +1,3 @@
-(library (name RExp))
+(library (name RExp)
+ (public_name RExp)
+)

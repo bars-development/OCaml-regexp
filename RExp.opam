@@ -1,0 +1,21 @@
+opam-version: "2.0"
+name: "RExp"
+version: "0.1"
+synopsis: "A regular expression library with multiple implementations"
+description: """
+RExp is an OCaml library for building and matching regular expressions.
+It provides two implementations: one using NFA-to-DFA conversion, and another using Brzozowski derivatives.
+"""
+authors: ["Your Name <your.email@example.com>"]
+maintainer: ["Your Name <your.email@example.com>"]
+license: "MIT"
+homepage: "https://your-repository-url"
+bug-reports: "https://your-repository-url/issues"
+depends: [
+  "dune" {>= "3.0"}
+  "ounit2" {with-test}  # Include only if you are using OUnit2 for testing
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+dev-repo: "git+https://your-repository-url"

@@ -22,6 +22,12 @@ This project implements a library for constructing and using deterministic finit
   - `Bitarray`: Efficient bit array operations.
   - `MyList`: List utilities such as sorted merging and equality checks.
   - `LookupTable`: Precomputed lookup tables for optimized operations.
+- **Simple Calculator**
+  - A program implementing a simple calculator is provided in `examples/calculator.ml`. It demonstrates how to:
+    - Read a string representing a mathematical expression.
+    - Use the regular expression engine to tokenize the input.
+    - Parse the tokens.
+    - Calculate and return the result of the expression.
 
 ---
 
@@ -35,6 +41,15 @@ Run the following command to build the project:
 
 ```bash
 dune build
+```
+
+### Run the calculator
+
+Run the following command to run the calculator code:
+The code will calculate "85 * (36.8+90*7)"
+
+```bash
+dune exec examples/calculator.exe
 ```
 
 ### Run Tests (Optional)
